@@ -23,6 +23,29 @@ step :: proc(dt: f32) -> bool {
 	return true
 }
 
+set_rectangle :: proc(x: f32, y: f32, width: f32, height: f32) {
+	x1 := x
+	x2 := x1 + width
+	y1 := y
+	y2 := y + height
+
+	rect_vert := [][5]f32 {
+		{x1, y1, 0.0, 0.0, 0.0},
+		{x2, y1, 0.0, 0.0, 0.0},
+		{x1, y2, 0.0, 0.0, 0.0},
+		{x1, y2, 0.0, 0.0, 0.0},
+		{x2, y1, 0.0, 0.0, 0.0},
+		{x2, y2, 0.0, 0.0, 0.0},
+	}
+
+	gl.BufferData(
+		gl.ARRAY_BUFFER,
+		len(rect_vert) * size_of(rect_vert[0]),
+		raw_data(rect_vert),
+		gl.STATIC_DRAW,
+	)
+}
+
 do_draw :: proc(ctx: ^Context) -> bool {
 	gl.SetCurrentContextById(GL_CTX_NAME)
 
@@ -49,8 +72,8 @@ do_draw :: proc(ctx: ^Context) -> bool {
 	}
 
 	{
-		proj := glm.mat4Perspective(glm.radians_f32(60), aspect_ratio, 0.1, 100)
-		view := glm.mat4LookAt({1.2, 1.2, 1.2}, {0, 0, 0}, {0, 0, 1})
+		proj := glm.mat4Perspective(glm.radians_f32(45), aspect_ratio, 0.1, 100)
+		view := glm.mat4LookAt({1.0, 1.0, 1.0}, {0, 0, 0}, {0, 0, 1})
 		model := glm.mat4Rotate({0, 0, 1}, ctx.accum_time)
 
 		mvp := proj * view * model
@@ -80,23 +103,9 @@ main :: proc() {
 	ctx.program, ok = gl.CreateProgramFromStrings({shader_vert}, {shader_frag})
 	assert(ok)
 
-	vertices := [][5]f32 {
-		{-0.5, +0.5, 1.0, 0.0, 0.0},
-		{+0.5, +0.5, 0.0, 1.0, 0.0},
-		{+0.5, -0.5, 1.0, 1.0, 0.0},
-		{+0.5, -0.5, 1.0, 1.0, 0.0},
-		{-0.5, -0.5, 0.0, 0.0, 1.0},
-		{-0.5, +0.5, 1.0, 0.0, 0.0},
-	}
-
 	ctx.buffer = gl.CreateBuffer()
 	gl.BindBuffer(gl.ARRAY_BUFFER, ctx.buffer)
-	gl.BufferData(
-		gl.ARRAY_BUFFER,
-		len(vertices) * size_of(vertices[0]),
-		raw_data(vertices),
-		gl.STATIC_DRAW,
-	)
+	set_rectangle(-0.5, -0.5, 0.5, 0.5)
 
 	fmt.println("Heee")
 }
