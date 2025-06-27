@@ -1,12 +1,13 @@
 package main
 
 import "core:fmt"
+import "core:math"
 import glm "core:math/linalg/glsl"
 import gl "vendor:wasm/WebGL"
 
 Context :: struct {
 	program:    gl.Program,
-	buffer:     gl.Buffer,
+	buffer:     [3]gl.Buffer,
 	accum_time: f32,
 }
 
@@ -30,12 +31,12 @@ set_rectangle :: proc(x: f32, y: f32, width: f32, height: f32) {
 	y2 := y + height
 
 	rect_vert := [][5]f32 {
-		{x1, y1, 0.0, 0.0, 0.0},
-		{x2, y1, 0.0, 0.0, 0.0},
-		{x1, y2, 0.0, 0.0, 0.0},
-		{x1, y2, 0.0, 0.0, 0.0},
-		{x2, y1, 0.0, 0.0, 0.0},
-		{x2, y2, 0.0, 0.0, 0.0},
+		{x1, y1, 1.0, 0.0, 0.0},
+		{x2, y1, 0.0, 1.0, 0.0},
+		{x1, y2, 0.0, 0.0, 1.0},
+		{x1, y2, 0.0, 0.0, 1.0},
+		{x2, y1, 0.0, 1.0, 0.0},
+		{x2, y2, 1.0, 0.0, 0.0},
 	}
 
 	gl.BufferData(
@@ -46,6 +47,111 @@ set_rectangle :: proc(x: f32, y: f32, width: f32, height: f32) {
 	)
 }
 
+set_cube :: proc(ctx: ^Context) {
+	cube := [][12]f32 {
+		{-1.0, -1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0},
+
+		// Back face
+		{-1.0, -1.0, -1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0, -1.0},
+
+		// Top face
+		{-1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0},
+
+		// Bottom face
+		{-1.0, -1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, 1.0, -1.0, -1.0, 1.0},
+
+		// Right face
+		{1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0, -1.0, 1.0},
+
+		// Left face
+		{-1.0, -1.0, -1.0, -1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0},
+	}
+
+	faceColors: [][4]f32 = {
+		{1.0, 1.0, 1.0, 1.0}, // Front face: white
+		{1.0, 0.0, 0.0, 1.0}, // Back face: red
+		{0.0, 1.0, 0.0, 1.0}, // Top face: green
+		{0.0, 0.0, 1.0, 1.0}, // Bottom face: blue
+		{1.0, 1.0, 0.0, 1.0}, // Right face: yellow
+		{1.0, 0.0, 1.0, 1.0}, // Left face: purple
+	}
+
+	// Convert the array of colors into a table for all the vertices.
+
+	colors: [dynamic][4]f32
+	defer delete(colors)
+
+	for c in faceColors {
+		// Repeat each color four times for the four vertices of the face
+		append(&colors, c, c, c, c)
+	}
+
+	indices: []i32 = {
+		0,
+		1,
+		2,
+		0,
+		2,
+		3, // front
+		4,
+		5,
+		6,
+		4,
+		6,
+		7, // back
+		8,
+		9,
+		10,
+		8,
+		10,
+		11, // top
+		12,
+		13,
+		14,
+		12,
+		14,
+		15, // bottom
+		16,
+		17,
+		18,
+		16,
+		18,
+		19, // right
+		20,
+		21,
+		22,
+		20,
+		22,
+		23, // left
+	}
+
+	positionBuffer := gl.CreateBuffer()
+	gl.BindBuffer(gl.ARRAY_BUFFER, positionBuffer)
+	gl.BufferData(gl.ARRAY_BUFFER, len(cube) * size_of(cube[0]), raw_data(cube), gl.STATIC_DRAW)
+	ctx.buffer[0] = positionBuffer
+
+	colorBuffer := gl.CreateBuffer()
+	gl.BindBuffer(gl.ARRAY_BUFFER, colorBuffer)
+	gl.BufferData(
+		gl.ARRAY_BUFFER,
+		len(colors) * size_of(colors[0]),
+		raw_data(colors),
+		gl.STATIC_DRAW,
+	)
+	ctx.buffer[1] = colorBuffer
+
+	indexBuffer := gl.CreateBuffer()
+	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer)
+	gl.BufferData(
+		gl.ELEMENT_ARRAY_BUFFER,
+		len(indices) * size_of(indices[0]),
+		raw_data(indices),
+		gl.STATIC_DRAW,
+	)
+	ctx.buffer[2] = indexBuffer
+
+}
+
 do_draw :: proc(ctx: ^Context) -> bool {
 	gl.SetCurrentContextById(GL_CTX_NAME)
 
@@ -54,36 +160,79 @@ do_draw :: proc(ctx: ^Context) -> bool {
 
 	aspect_ratio := f32(max(width, 1)) / f32(max(height, 1))
 
-	gl.ClearColor(0.5, 0.7, 1.0, 1.0)
+	gl.ClearColor(0.8, 0.2, 1.0, 1.0)
 	gl.Clear(gl.COLOR_BUFFER_BIT)
 
 	gl.UseProgram(ctx.program)
 
 	{
 		loc := gl.GetAttribLocation(ctx.program, "a_position")
+		gl.BindBuffer(gl.ARRAY_BUFFER, ctx.buffer[0])
 		gl.EnableVertexAttribArray(loc)
-		gl.VertexAttribPointer(loc, 2, gl.FLOAT, false, size_of([5]f32), 0)
+		gl.VertexAttribPointer(loc, 3, gl.FLOAT, false, 0, 0)
 	}
 
 	{
 		loc := gl.GetAttribLocation(ctx.program, "a_color")
+		gl.BindBuffer(gl.ARRAY_BUFFER, ctx.buffer[1])
 		gl.EnableVertexAttribArray(loc)
-		gl.VertexAttribPointer(loc, 3, gl.FLOAT, false, size_of([5]f32), size_of([2]f32))
+		gl.VertexAttribPointer(loc, 4, gl.FLOAT, false, 0, 0)
 	}
 
 	{
-		proj := glm.mat4Perspective(glm.radians_f32(45), aspect_ratio, 0.1, 100)
-		view := glm.mat4LookAt({1.0, 1.0, 1.0}, {0, 0, 0}, {0, 0, 1})
-		model := glm.mat4Rotate({0, 0, 1}, ctx.accum_time)
+		proj := glm.mat4Perspective(glm.radians_f32(60), aspect_ratio, 0.1, 500)
+		view := glm.mat4LookAt({2.2, 2.2, 2.2}, {0, 0, 0}, {0, 0, 1})
+		model := glm.mat4Rotate({0.1, 0.1, 1}, ctx.accum_time)
 
 		mvp := proj * view * model
 
-		loc := gl.GetUniformLocation(ctx.program, "u_mvp")
+		loc := gl.GetUniformLocation(ctx.program, "u_matrix")
 		gl.UniformMatrix4fv(loc, mvp)
 	}
 
-	gl.BindBuffer(gl.ARRAY_BUFFER, ctx.buffer)
-	gl.DrawArrays(gl.TRIANGLES, 0, 6)
+	indices: []u32 = {
+		0,
+		1,
+		2,
+		0,
+		2,
+		3, // front
+		4,
+		5,
+		6,
+		4,
+		6,
+		7, // back
+		8,
+		9,
+		10,
+		8,
+		10,
+		11, // top
+		12,
+		13,
+		14,
+		12,
+		14,
+		15, // bottom
+		16,
+		17,
+		18,
+		16,
+		18,
+		19, // right
+		20,
+		21,
+		22,
+		20,
+		22,
+		23, // left
+	}
+
+	// gl.BindBuffer(gl.ARRAY_BUFFER, ctx.buffer)
+	// gl.DrawArrays(gl.TRIANGLES, 0, 36)
+	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, ctx.buffer[2])
+	gl.DrawElements(gl.TRIANGLES, 36, gl.UNSIGNED_INT, nil)
 
 	return true
 }
@@ -96,45 +245,46 @@ main :: proc() {
 
 	ctx := &global_ctx
 
-	gl.ClearColor(0.4, 0.0, 0.8, 1.0)
-	gl.Clear(gl.COLOR_BUFFER_BIT)
-
 	ok: bool
 	ctx.program, ok = gl.CreateProgramFromStrings({shader_vert}, {shader_frag})
 	assert(ok)
 
-	ctx.buffer = gl.CreateBuffer()
-	gl.BindBuffer(gl.ARRAY_BUFFER, ctx.buffer)
-	set_rectangle(-0.5, -0.5, 0.5, 0.5)
+	// set_rectangle(0.0, 0.0, 0.5, 0.5)
+	set_cube(ctx)
+
+	event_ptr: u32 = 0
+	init_event_raw(event_ptr)
+
+	// trigger_mouse_event()
 
 	fmt.println("Heee")
+	// fmt.printfln("Heee %d", mouseEvData.clientX)
 }
 
-
 shader_vert := `
-precision highp float;
+precision mediump float;
 
-attribute vec2 a_position;
-attribute vec3 a_color;
+attribute vec3 a_position;
+attribute vec4 a_color;
 
-uniform mat4 u_mvp;
+uniform mat4 u_matrix;
 
-varying vec3 v_color;
+varying vec4 v_color;
 
 void main(){
     v_color = a_color;
-    gl_Position = u_mvp * vec4(a_position, 0.0, 1.0);
+    gl_Position = u_matrix * vec4(a_position, 1);
 }
 `
 
 
 shader_frag := `
-precision highp float;
+precision mediump float;
 
-varying vec3 v_color;
+varying vec4 v_color;
 
 void main(){
-    gl_FragColor = vec4(v_color, 1.0);
+    gl_FragColor = v_color;
 }
 
 `
