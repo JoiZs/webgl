@@ -11,7 +11,13 @@
 <pre id="gl-console"></pre>
 <script type="text/javascript" src="runtime.js"></script>
 <script type="text/javascript">
-	odin.runWasm("index.wasm", document.getElementById("gl-console"));
+    const wMm = new odin.WasmMemoryInterface()
+
+	odin.runWasm("index.wasm", document.getElementById("gl-console"), undefined, wMm);
+
+    document.getElementById("webgl-canvas").addEventListener("mousemove", e=>{
+        
+    })
 </script>
 
 </html>
