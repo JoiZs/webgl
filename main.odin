@@ -180,14 +180,18 @@ do_draw :: proc(ctx: ^Context) -> bool {
 	}
 
 	{
-		proj := glm.mat4Perspective(glm.radians_f32(60), aspect_ratio, 0.1, 500)
-		view := glm.mat4LookAt({2.2, 2.2, 2.2}, {0, 0, 0}, {0, 0, 1})
-		model := glm.mat4Rotate({0.1, 0.1, 1}, ctx.accum_time)
+		// proj := glm.mat4Perspective(glm.radians_f32(60), aspect_ratio, 0.1, 100)
+		proj := glm.mat4Ortho3d(-2, 2, -2, 2, -2, 10)
+		view := glm.mat4LookAt({0, 0, -8.0}, {0, 0, 0}, {-2, -2, 1})
+		model := glm.mat4Rotate({0, math.sin_f32(1), math.cos_f32(0.5)}, ctx.accum_time)
 
 		mvp := proj * view * model
 
 		loc := gl.GetUniformLocation(ctx.program, "u_matrix")
 		gl.UniformMatrix4fv(loc, mvp)
+	}
+
+	{
 	}
 
 	indices: []u32 = {
