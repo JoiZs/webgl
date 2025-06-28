@@ -179,19 +179,45 @@ do_draw :: proc(ctx: ^Context) -> bool {
 		gl.VertexAttribPointer(loc, 4, gl.FLOAT, false, 0, 0)
 	}
 
+	// {
+	// 	// proj := glm.mat4Perspective(glm.radians_f32(60), aspect_ratio, 0.1, 100)
+	// 	proj := glm.mat4Ortho3d(-2, 2, -2, 2, -2, 10)
+	// 	view := glm.mat4LookAt({0, 0, -8.0}, {0, 0, 0}, {-2, -2, 1})
+	// 	model := glm.mat4Rotate({0, math.sin_f32(1), math.cos_f32(0.5)}, ctx.accum_time)
+
+	// 	mvp := proj * view * model
+
+	// 	loc := gl.GetUniformLocation(ctx.program, "u_matrix")
+	// 	gl.UniformMatrix4fv(loc, mvp)
+	// }
+
 	{
-		// proj := glm.mat4Perspective(glm.radians_f32(60), aspect_ratio, 0.1, 100)
-		proj := glm.mat4Ortho3d(-2, 2, -2, 2, -2, 10)
-		view := glm.mat4LookAt({0, 0, -8.0}, {0, 0, 0}, {-2, -2, 1})
-		model := glm.mat4Rotate({0, math.sin_f32(1), math.cos_f32(0.5)}, ctx.accum_time)
+		num_of_matrices := 5
+		matrices: []glm.mat4x4 = {
+			glm.identity(glm.mat4x4),
+			glm.identity(glm.mat4x4),
+			glm.identity(glm.mat4x4),
+			glm.identity(glm.mat4x4),
+			glm.identity(glm.mat4x4),
+		}
 
-		mvp := proj * view * model
+		for mat, idx in matrices {
+			// proj_mat := glm.mat4Ortho3d(-5, 5, -5, 5, -5, 5)
+			proj_mat := glm.mat4Perspective(glm.radians_f32(30), aspect_ratio, -8, 4)
+			view := glm.mat4LookAt({-8.0, -4.0, 0}, {0, 0, 0}, {0, 0, 1})
+			translate_mat := glm.mat4Translate({f32(-1) + f32(idx), 0, 0})
+			rotate_mat := glm.mat4Rotate({1, 0, 1}, ctx.accum_time)
+			scale_mat := glm.mat4Scale({-0.2, -0.2, -0.2})
 
-		loc := gl.GetUniformLocation(ctx.program, "u_matrix")
-		gl.UniformMatrix4fv(loc, mvp)
-	}
+			m_mat := proj_mat * view * translate_mat * rotate_mat * scale_mat * mat
 
-	{
+			loc := gl.GetUniformLocation(ctx.program, "u_matrix")
+			gl.UniformMatrix4fv(loc, m_mat)
+
+			gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, ctx.buffer[2])
+			gl.DrawElements(gl.TRIANGLES, 36, gl.UNSIGNED_INT, nil)
+		}
+
 	}
 
 	indices: []u32 = {
@@ -233,10 +259,8 @@ do_draw :: proc(ctx: ^Context) -> bool {
 		23, // left
 	}
 
-	// gl.BindBuffer(gl.ARRAY_BUFFER, ctx.buffer)
-	// gl.DrawArrays(gl.TRIANGLES, 0, 36)
-	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, ctx.buffer[2])
-	gl.DrawElements(gl.TRIANGLES, 36, gl.UNSIGNED_INT, nil)
+	// gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, ctx.buffer[2])
+	// gl.DrawElements(gl.TRIANGLES, 36, gl.UNSIGNED_INT, nil)
 
 	return true
 }
@@ -252,6 +276,9 @@ main :: proc() {
 	ok: bool
 	ctx.program, ok = gl.CreateProgramFromStrings({shader_vert}, {shader_frag})
 	assert(ok)
+
+	ag_inst_ext := gl.IsExtensionSupported("ANGLE_instanced_arrays")
+	assert(ag_inst_ext)
 
 	// set_rectangle(0.0, 0.0, 0.5, 0.5)
 	set_cube(ctx)
